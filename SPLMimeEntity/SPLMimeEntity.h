@@ -11,6 +11,9 @@
  ^               ^               ^
  label           mailbox         domain
  */
+
+#import <Foundation/Foundation.h>
+
 @interface SPLMailbox : NSObject
 
 @property (nonatomic, readonly) NSString *mailbox;
