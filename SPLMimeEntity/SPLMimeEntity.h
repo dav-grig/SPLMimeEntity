@@ -13,12 +13,13 @@
  */
 
 #import <Foundation/Foundation.h>
+#import "EMWMimeConvert.h"
 
-@interface SPLMailbox : NSObject
+@interface SPLMailbox : MimeConvert <NSCoding>
 
-@property (nonatomic, readonly) NSString *mailbox;
-@property (nonatomic, readonly) NSString *domain;
-@property (nonatomic, readonly) NSString *label;
+@property (nonatomic, copy) NSString *mailbox;
+@property (nonatomic, copy) NSString *domain;
+@property (nonatomic, copy) NSString *label;
 
 @end
 
@@ -27,36 +28,36 @@
 /**
  @abstract  <#abstract comment#>
  */
-@interface SPLMimeEntity : NSObject
+@interface SPLMimeEntity : MimeConvert <NSCoding>
 
-- (NSString *)valueForHeaderKey:(NSString *)headerKey;
-
-
+- (NSString *)valueForHeaderKey:(NSString *)headerKey InUtf8:(BOOL)inUtf8;
 
 - (instancetype)initWithString:(NSString *)string;
 
 // EML properties
-@property (nonatomic, readonly) SPLMailbox *sender;
-@property (nonatomic, readonly) NSArray *from;
-@property (nonatomic, readonly) NSArray *to;
+@property (nonatomic, retain) SPLMailbox *sender;
+@property (nonatomic, copy) NSArray *from;
+@property (nonatomic, copy) NSArray *to;
 
-@property (nonatomic, readonly) NSString *subject;
-@property (nonatomic, readonly) NSString *timeStamp;
-@property (nonatomic, readonly) NSString *contentType;
+@property (nonatomic, copy) NSString *subject;
+@property (nonatomic, copy) NSString *timeStamp;
+@property (nonatomic, copy) NSString *contentType;
+@property (nonatomic, copy) NSString *importance;
 
-@property (nonatomic, readonly) NSArray *replyTo;
-@property (nonatomic, readonly) NSArray *cc;
-@property (nonatomic, readonly) NSArray *bcc;
+@property (nonatomic, copy) NSArray *replyTo;
+@property (nonatomic, copy) NSArray *cc;
+@property (nonatomic, copy) NSArray *bcc;
 
-@property (nonatomic, readonly) NSString *messageId;
+@property (nonatomic, copy) NSString *messageId;
 
-@property (nonatomic, readonly) NSArray *bodyParts;
+@property (nonatomic, copy) NSArray *bodyParts;
 
 - (NSArray *)inlineBodyParts;
 - (NSArray *)attachmentBodyParts;
 
 // body part
-@property (nonatomic, readonly) NSData *bodyData;
-@property (nonatomic, readonly) NSString *filename;
+@property (nonatomic, copy) NSString *fileName;
+@property (nonatomic, copy) NSString *base64BodyDataString;
+@property (nonatomic, copy) NSString *bodyDataString;
 
 @end

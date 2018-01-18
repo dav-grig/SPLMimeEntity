@@ -7,54 +7,43 @@
 //
 
 #import "SPLMimeEntity.h"
+#import "Base64.h"
 
 #include <iostream>
+#include <algorithm>
 #include <mimetic/mimetic.h>
 
 using namespace std;
 using namespace mimetic;
 
-inline NSString *MimeEntityGetHeaderValue(MimeEntity *mimeEntity, NSString *headerKey)
+static NSString *dataFromStringWithEncodingBase64(NSString *bodyString, NSString *encoding)
 {
-    if (mimeEntity->header().hasField(headerKey.UTF8String)) {
-        return [NSString stringWithUTF8String:mimeEntity->header().field(headerKey.UTF8String).value().c_str()];
-    }
-
-    return nil;
-}
-
-static NSData *dataFromStringWithEncoding(NSString *bodyString, NSString *encoding)
-{
-    if ([encoding.lowercaseString isEqualToString:@"base64"]) {
-        return [[bodyString dataUsingEncoding:NSUTF8StringEncoding] base64EncodedDataWithOptions:0];
+    if ([encoding.lowercaseString isEqualToString:@"base64"])
+    {
+        return bodyString;
     } else {
-        if ([encoding rangeOfString:@"quoted-printable"].length > 0) {
-            bodyString = [bodyString stringByReplacingOccurrencesOfString:@"=\r\n" withString:@""];
-            bodyString = [bodyString stringByReplacingOccurrencesOfString:@"=" withString:@"%"];
-            bodyString = [bodyString stringByReplacingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
-        }
-
-        return [bodyString dataUsingEncoding:NSUTF8StringEncoding];
+        return nil;
     }
 }
-
-
 
 @implementation SPLMailbox
+@synthesize mailbox = _mailbox;
+@synthesize domain = _domain;
+@synthesize label = _label;
 
 - (instancetype)initWithMailbox:(const Mailbox &)mailbox
 {
     if (self = [super init]) {
         if (mailbox.mailbox(0).length() > 0) {
-            _mailbox = [NSString stringWithUTF8String:mailbox.mailbox(0).c_str()];
+            _mailbox = ConvertHeader(mailbox.mailbox(0).c_str());
         }
-
+        
         if (mailbox.domain(0).length() > 0) {
             _domain = [NSString stringWithFormat:@"%s", mailbox.domain(0).c_str()];
         }
-
+        
         if (mailbox.label(0).length() > 0) {
-            _label = [NSString stringWithUTF8String:mailbox.label(0).c_str()];
+            _label = ConvertHeader(mailbox.label(0).c_str());
         }
     }
     return self;
@@ -65,6 +54,25 @@ static NSData *dataFromStringWithEncoding(NSString *bodyString, NSString *encodi
     return [NSString stringWithFormat:@"%@: mailbox = %@, domain = %@, label = %@", [super description], self.mailbox, self.domain, self.label];
 }
 
+#pragma mark - NSCoding protocol ()
+
+- (void)encodeWithCoder:(nonnull NSCoder *)aCoder
+{
+    [aCoder encodeObject:_mailbox forKey:@"mailbox"];
+    [aCoder encodeObject:_domain forKey:@"domain"];
+    [aCoder encodeObject:_label forKey:@"label"];
+}
+
+- (nullable instancetype)initWithCoder:(nonnull NSCoder *)aDecoder
+{
+    if (self = [super init]) {
+        self.mailbox = [aDecoder decodeObjectForKey:@"mailbox"];
+        self.domain = [aDecoder decodeObjectForKey:@"domain"];
+        self.label = [aDecoder decodeObjectForKey:@"label"];
+    }
+    return self;
+}
+
 @end
 
 
@@ -72,7 +80,7 @@ static NSData *dataFromStringWithEncoding(NSString *bodyString, NSString *encodi
 @interface SPLMimeEntity ()
 
 @property (nonatomic, assign) MimeEntity *mimeEntity;
-@property (nonatomic, strong) NSString *string;
+@property (nonatomic, copy) NSString *string;
 @property (nonatomic, assign) BOOL retainsOwnership;
 
 @end
@@ -80,52 +88,76 @@ static NSData *dataFromStringWithEncoding(NSString *bodyString, NSString *encodi
 
 
 @implementation SPLMimeEntity
+@synthesize sender = _sender;
+@synthesize from = _from;
+@synthesize to = _to;
+@synthesize subject = _subject;
+@synthesize timeStamp = _timeStamp;
+@synthesize contentType = _contentType;
+@synthesize importance = _importance;
+@synthesize replyTo = _replyTo;
+@synthesize cc = _cc;
+@synthesize bcc = _bcc;
+@synthesize messageId = _messageId;
+@synthesize bodyParts = _bodyParts;
+@synthesize base64BodyDataString = _base64BodyDataString;
+@synthesize string = _string;
+@synthesize fileName = _fileName;
+@synthesize bodyDataString = _bodyDataString;
 
 #pragma mark - Initialization
 
 - (NSArray *)inlineBodyParts
 {
     NSMutableArray *inlineBodyParts = [NSMutableArray array];
-
-    for (SPLMimeEntity *bodyPart in self.bodyParts) {
+    
+    for (SPLMimeEntity *bodyPart in self.bodyParts)
+    {
         if (bodyPart.bodyParts.count > 0) {
             [inlineBodyParts addObjectsFromArray:bodyPart.inlineBodyParts];
-        } else if ([[bodyPart valueForHeaderKey:@"Content-Disposition"].lowercaseString rangeOfString:@"attachment"].length == 0) {
+        } else if ([[bodyPart valueForHeaderKey:@"Content-Disposition" InUtf8:YES].lowercaseString rangeOfString:@"attachment"].length == 0)
+        {
             [inlineBodyParts addObject:bodyPart];
         }
     }
-
+    
     return [inlineBodyParts copy];
 }
 
 - (NSArray *)attachmentBodyParts
 {
     NSMutableArray *attachmentBodyParts = [NSMutableArray array];
-
-    for (SPLMimeEntity *bodyPart in self.bodyParts) {
+    
+    for (SPLMimeEntity *bodyPart in self.bodyParts)
+    {
         if (bodyPart.bodyParts.count > 0) {
             [attachmentBodyParts addObjectsFromArray:bodyPart.attachmentBodyParts];
-        } else if ([[bodyPart valueForHeaderKey:@"Content-Disposition"].lowercaseString rangeOfString:@"attachment"].length > 0) {
+        } else if ([[bodyPart valueForHeaderKey:@"Content-Disposition" InUtf8:YES].lowercaseString rangeOfString:@"attachment"].length > 0)
+        {
             [attachmentBodyParts addObject:bodyPart];
         }
     }
-
+    
     return [attachmentBodyParts copy];
 }
 
 - (NSString *)filename
 {
-    NSString *contentDisposition = [self valueForHeaderKey:@"Content-Disposition"];
-    if ([contentDisposition.lowercaseString rangeOfString:@"attachment"].length > 0) {
-        for (__strong NSString *keyValuePairString in [contentDisposition componentsSeparatedByString:@";"]) {
+    NSString *contentDisposition = [self valueForHeaderKey:@"Content-Disposition" InUtf8:NO];
+    if ([contentDisposition.lowercaseString rangeOfString:@"attachment"].length > 0)
+    {
+        for (__strong NSString *keyValuePairString in [contentDisposition componentsSeparatedByString:@";"])
+        {
             keyValuePairString = [keyValuePairString stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
             NSArray *keyValuePair = [keyValuePairString componentsSeparatedByString:@"="];
-
-            if (keyValuePair.count == 2) {
+            
+            if (keyValuePair.count == 2)
+            {
                 NSString *key = keyValuePair[0];
                 NSString *value = keyValuePair[1];
-
-                if ([key isEqual:@"filename"] || [key isEqual:@"name"]) {
+                
+                if ([key containsString:@"filename"] || [key isEqual:@"name"])
+                {
                     NSMutableCharacterSet *characterSet = [NSMutableCharacterSet whitespaceAndNewlineCharacterSet];
                     [characterSet addCharactersInString:@"\""];
                     return [value stringByTrimmingCharactersInSet:characterSet];
@@ -133,23 +165,26 @@ static NSData *dataFromStringWithEncoding(NSString *bodyString, NSString *encodi
             }
         }
     }
-
+    
     return nil;
 }
 
 - (instancetype)initWithMimeEntitiy:(MimeEntity *)mimeEntitiy retainOwnership:(BOOL)retainOwnership
 {
-    if (self = [super init]) {
+    if (self = [super init])
+    {
         _mimeEntity = mimeEntitiy;
         _retainsOwnership = retainOwnership;
-
+        
         _sender = [[SPLMailbox alloc] initWithMailbox:_mimeEntity->header().sender()];
-
-        _subject = [self valueForHeaderKey:@"Subject"];
-        _timeStamp = [self valueForHeaderKey:@"Date"];
-        _messageId = [self valueForHeaderKey:@"Message-ID"];
-        _contentType = [self valueForHeaderKey:@"Content-Type"];
-
+        
+        _subject = [self valueForHeaderKey:@"Subject" InUtf8:NO];
+        _timeStamp = [self valueForHeaderKey:@"Date" InUtf8:YES];
+        _messageId = [self valueForHeaderKey:@"Message-ID" InUtf8:YES];
+        _contentType = [self valueForHeaderKey:@"Content-Type" InUtf8:YES];
+        _importance = [self valueForHeaderKey:@"Importance" InUtf8:YES];
+        _fileName = [self filename];
+        
         {
             NSMutableArray *array = [NSMutableArray array];
             auto i = _mimeEntity->header().from().begin();
@@ -159,7 +194,7 @@ static NSData *dataFromStringWithEncoding(NSString *bodyString, NSString *encodi
             }
             _from = [array copy];
         }
-
+        
         {
             NSMutableArray *array = [NSMutableArray array];
             auto i = _mimeEntity->header().to().begin();
@@ -169,7 +204,7 @@ static NSData *dataFromStringWithEncoding(NSString *bodyString, NSString *encodi
             }
             _to = [array copy];
         }
-
+        
         {
             NSMutableArray *array = [NSMutableArray array];
             auto i = _mimeEntity->header().replyto().begin();
@@ -179,7 +214,7 @@ static NSData *dataFromStringWithEncoding(NSString *bodyString, NSString *encodi
             }
             _replyTo = [array copy];
         }
-
+        
         {
             NSMutableArray *array = [NSMutableArray array];
             auto i = _mimeEntity->header().cc().begin();
@@ -189,7 +224,7 @@ static NSData *dataFromStringWithEncoding(NSString *bodyString, NSString *encodi
             }
             _cc = [array copy];
         }
-
+        
         {
             NSMutableArray *array = [NSMutableArray array];
             auto i = _mimeEntity->header().bcc().begin();
@@ -199,22 +234,23 @@ static NSData *dataFromStringWithEncoding(NSString *bodyString, NSString *encodi
             }
             _bcc = [array copy];
         }
-
-        _bodyData = dataFromStringWithEncoding([NSString stringWithUTF8String:_mimeEntity->body().c_str()], [self valueForHeaderKey:@"Content-Transfer-Encoding"]);
-
+        
+        _bodyDataString = bodyDataFromStringWithEncoding(_mimeEntity->body().c_str(), [self valueForHeaderKey:@"Content-Type" InUtf8:YES], [self valueForHeaderKey:@"Content-Transfer-Encoding" InUtf8:YES]);
+        _base64BodyDataString = dataFromStringWithEncodingBase64([NSString stringWithUTF8String:_mimeEntity->body().c_str()], [self valueForHeaderKey:@"Content-Transfer-Encoding" InUtf8:YES]);
+        
         {
             NSMutableArray *bodyParts = [NSMutableArray array];
-
+            
             auto i = _mimeEntity->body().parts().begin();
             while (i != _mimeEntity->body().parts().end()) {
                 [bodyParts addObject:[[SPLMimeEntity alloc] initWithMimeEntitiy:*i retainOwnership:NO] ];
                 ++i;
             }
-
+            
             _bodyParts = [bodyParts copy];
         }
     }
-
+    
     return self;
 }
 
@@ -223,10 +259,10 @@ static NSData *dataFromStringWithEncoding(NSString *bodyString, NSString *encodi
     if (!string) {
         return nil;
     }
-
+    
     istringstream str(string.UTF8String);
     istreambuf_iterator<char> bit(str), eit;
-
+    
     return [self initWithMimeEntitiy:new MimeEntity(bit,eit) retainOwnership:YES];
 }
 
@@ -243,20 +279,114 @@ static NSData *dataFromStringWithEncoding(NSString *bodyString, NSString *encodi
             , [super description], self.subject, self.sender, self.from, self.to, self.replyTo, self.cc, self.bcc, self.bodyParts];
 }
 
-- (NSString *)valueForHeaderKey:(NSString *)headerKey
+- (NSString *)valueForHeaderKey:(NSString *)headerKey InUtf8:(BOOL)inUtf8
 {
-    return MimeEntityGetHeaderValue(_mimeEntity, headerKey);
+    return  MimeEntityGetHeaderValue(_mimeEntity, headerKey, inUtf8);
 }
+
 
 #pragma mark - Memory management
 
 - (void)dealloc
 {
-    if (_mimeEntity && _retainsOwnership) {
+    if (_mimeEntity && _retainsOwnership)
+    {
         delete _mimeEntity, _mimeEntity = NULL;
     }
 }
 
-#pragma mark - Private category implementation ()
+#pragma mark - NSCoding protocol ()
+
+- (void)encodeWithCoder:(nonnull NSCoder *)aCoder
+{
+    [aCoder encodeObject:_sender forKey:@"sender"];
+    [aCoder encodeObject:_from forKey:@"from"];
+    [aCoder encodeObject:_to forKey:@"to"];
+    [aCoder encodeObject:_subject forKey:@"subject"];
+    [aCoder encodeObject:_timeStamp forKey:@"timeStamp"];
+    [aCoder encodeObject:_contentType forKey:@"contentType"];
+    [aCoder encodeObject:_importance forKey:@"importance"];
+    [aCoder encodeObject:_replyTo forKey:@"replyTo"];
+    [aCoder encodeObject:_cc forKey:@"cc"];
+    [aCoder encodeObject:_bcc forKey:@"bcc"];
+    [aCoder encodeObject:_messageId forKey:@"messageId"];
+    [aCoder encodeObject:_bodyParts forKey:@"bodyParts"];
+    [aCoder encodeObject:_base64BodyDataString forKey:@"base64BodyDataString"];
+    [aCoder encodeObject:_bodyDataString forKey:@"bodyDataString"];
+    [aCoder encodeObject:_string forKey:@"string"];
+    [aCoder encodeObject:_fileName forKey:@"fileName"];
+}
+
+- (nullable instancetype)initWithCoder:(nonnull NSCoder *)aDecoder
+{
+    if (self = [super init]) {
+        self.sender = [aDecoder decodeObjectForKey:@"sender"];
+        self.from = [aDecoder decodeObjectForKey:@"from"];
+        self.to = [aDecoder decodeObjectForKey:@"to"];
+        self.subject = [aDecoder decodeObjectForKey:@"subject"];
+        self.timeStamp = [aDecoder decodeObjectForKey:@"timeStamp"];
+        self.contentType = [aDecoder decodeObjectForKey:@"contentType"];
+        self.importance = [aDecoder decodeObjectForKey:@"importance"];
+        self.replyTo = [aDecoder decodeObjectForKey:@"replyTo"];
+        self.cc = [aDecoder decodeObjectForKey:@"cc"];
+        self.bcc = [aDecoder decodeObjectForKey:@"bcc"];
+        self.messageId = [aDecoder decodeObjectForKey:@"messageId"];
+        self.bodyParts = [aDecoder decodeObjectForKey:@"bodyParts"];
+        self.base64BodyDataString = [aDecoder decodeObjectForKey:@"base64BodyDataString"];
+        self.bodyDataString = [aDecoder decodeObjectForKey:@"bodyDataString"];
+        self.string = [aDecoder decodeObjectForKey:@"string"];
+        self.fileName = [aDecoder decodeObjectForKey:@"fileName"];
+    }
+    return self;
+}
+
+NSString *bodyDataFromStringWithEncoding(const char *bodyData, NSString *contentType, NSString *encoding)
+{
+    Mime_Content_Type contenttype = MimeContentType_Other;
+    Mime_Encoding encode = MimeEncoding_Other;
+    if ([contentType.lowercaseString containsString:@"text/html; charset=\"koi8-r\""] || [contentType.lowercaseString containsString:@"text/plain; charset=\"koi8-r\""] )
+    {
+        contenttype = MimeContentType_KOI8_R;
+    }
+    if ([contentType.lowercaseString containsString:@"text/plain; charset=\"windows-1251\""] || [contentType.lowercaseString containsString:@"text/html; charset=\"windows-1251\""] )
+    {
+        contenttype = MimeContentType_Windows_1251;
+    }
+    if ([encoding containsString:@"quoted-printable"])
+    {
+        encode = MimeEncoding_Quoted_printable;
+    }
+    if ([encoding.lowercaseString containsString:@"base64"])
+    {
+        encode = MimeEncoding_Base64;
+    }
+    
+    if ((contenttype == MimeContentType_KOI8_R || contenttype == MimeContentType_Windows_1251) && (encode == MimeEncoding_Quoted_printable || encode == MimeEncoding_Base64))
+    {
+        return ConvertFrom(bodyData, contenttype, encode);
+    }
+    NSString *bodyDataString = [NSString stringWithUTF8String:bodyData];
+    if (encode == MimeEncoding_Quoted_printable)
+    {
+        bodyDataString = [bodyDataString stringByReplacingOccurrencesOfString:@"=\r\n" withString:@""];
+        bodyDataString = [bodyDataString stringByReplacingOccurrencesOfString:@"=" withString:@"%"];
+        bodyDataString = [bodyDataString stringByRemovingPercentEncoding];
+        return bodyDataString;
+    }
+    if (encode == MimeEncoding_Base64)
+    {
+        return nil;
+    }
+    return bodyDataString;
+}
+
+NSString *MimeEntityGetHeaderValue(MimeEntity *mimeEntity, NSString *headerKey, BOOL inUtf8)
+{
+    if (!(mimeEntity->header().hasField(headerKey.UTF8String)))
+    {
+        return nil;
+    }
+    return inUtf8 ? [NSString stringWithUTF8String:mimeEntity->header().field(headerKey.UTF8String).value().c_str()] : ConvertHeader(mimeEntity->header().field(headerKey.UTF8String).value().c_str());
+}
 
 @end
