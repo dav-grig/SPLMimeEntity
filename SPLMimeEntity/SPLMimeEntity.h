@@ -15,7 +15,7 @@
 #import <Foundation/Foundation.h>
 #import "EMWMimeConvert.h"
 
-@interface SPLMailbox : MimeConvert <NSCoding>
+@interface SPLMailbox : NSObject <NSCoding>
 
 @property (nonatomic, copy) NSString *mailbox;
 @property (nonatomic, copy) NSString *domain;
@@ -28,7 +28,7 @@
 /**
  @abstract  <#abstract comment#>
  */
-@interface SPLMimeEntity : MimeConvert <NSCoding>
+@interface SPLMimeEntity : NSObject <NSCoding>
 
 - (NSString *)valueForHeaderKey:(NSString *)headerKey InUtf8:(BOOL)inUtf8;
 
@@ -42,6 +42,7 @@
 @property (nonatomic, copy) NSString *subject;
 @property (nonatomic, copy) NSString *timeStamp;
 @property (nonatomic, copy) NSString *contentType;
+@property (nonatomic, copy) NSString *contentId;
 @property (nonatomic, copy) NSString *importance;
 
 @property (nonatomic, copy) NSArray *replyTo;

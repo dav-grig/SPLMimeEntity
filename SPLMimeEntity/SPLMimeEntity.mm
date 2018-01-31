@@ -35,7 +35,7 @@ static NSString *dataFromStringWithEncodingBase64(NSString *bodyString, NSString
 {
     if (self = [super init]) {
         if (mailbox.mailbox(0).length() > 0) {
-            _mailbox = ConvertHeader(mailbox.mailbox(0).c_str());
+            _mailbox = [MimeConvert ConvertHeader:mailbox.mailbox(0).c_str()];
         }
         
         if (mailbox.domain(0).length() > 0) {
@@ -43,7 +43,7 @@ static NSString *dataFromStringWithEncodingBase64(NSString *bodyString, NSString
         }
         
         if (mailbox.label(0).length() > 0) {
-            _label = ConvertHeader(mailbox.label(0).c_str());
+            _label = [MimeConvert ConvertHeader:mailbox.label(0).c_str()];
         }
     }
     return self;
@@ -94,6 +94,7 @@ static NSString *dataFromStringWithEncodingBase64(NSString *bodyString, NSString
 @synthesize subject = _subject;
 @synthesize timeStamp = _timeStamp;
 @synthesize contentType = _contentType;
+@synthesize contentId = _contentId;
 @synthesize importance = _importance;
 @synthesize replyTo = _replyTo;
 @synthesize cc = _cc;
@@ -143,21 +144,27 @@ static NSString *dataFromStringWithEncodingBase64(NSString *bodyString, NSString
 
 - (NSString *)filename
 {
-    NSString *contentDisposition = [self valueForHeaderKey:@"Content-Disposition" InUtf8:NO];
+    NSString *headerKey = @"Content-Disposition";
+    NSString *contentDisposition = [NSString stringWithUTF8String:_mimeEntity->header().field(headerKey.UTF8String).value().c_str()];
     if ([contentDisposition.lowercaseString rangeOfString:@"attachment"].length > 0)
     {
         for (__strong NSString *keyValuePairString in [contentDisposition componentsSeparatedByString:@";"])
         {
             keyValuePairString = [keyValuePairString stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-            NSArray *keyValuePair = [keyValuePairString componentsSeparatedByString:@"="];
+            NSString *separatedString = @"=";
+            if ([keyValuePairString containsString:@"=\""]) {
+                separatedString = @"=\"";
+            }
+            NSArray *keyValuePair = [keyValuePairString componentsSeparatedByString:separatedString];
             
-            if (keyValuePair.count == 2)
+            if (keyValuePair.count >= 2)
             {
                 NSString *key = keyValuePair[0];
                 NSString *value = keyValuePair[1];
                 
                 if ([key containsString:@"filename"] || [key isEqual:@"name"])
                 {
+                    value = [MimeConvert ConvertHeader:[value UTF8String]]; //ConvertHeader([value UTF8String]);
                     NSMutableCharacterSet *characterSet = [NSMutableCharacterSet whitespaceAndNewlineCharacterSet];
                     [characterSet addCharactersInString:@"\""];
                     return [value stringByTrimmingCharactersInSet:characterSet];
@@ -182,6 +189,7 @@ static NSString *dataFromStringWithEncodingBase64(NSString *bodyString, NSString
         _timeStamp = [self valueForHeaderKey:@"Date" InUtf8:YES];
         _messageId = [self valueForHeaderKey:@"Message-ID" InUtf8:YES];
         _contentType = [self valueForHeaderKey:@"Content-Type" InUtf8:YES];
+        _contentId = [self valueForHeaderKey:@"Content-ID" InUtf8:YES];
         _importance = [self valueForHeaderKey:@"Importance" InUtf8:YES];
         _fileName = [self filename];
         
@@ -305,6 +313,7 @@ static NSString *dataFromStringWithEncodingBase64(NSString *bodyString, NSString
     [aCoder encodeObject:_subject forKey:@"subject"];
     [aCoder encodeObject:_timeStamp forKey:@"timeStamp"];
     [aCoder encodeObject:_contentType forKey:@"contentType"];
+    [aCoder encodeObject:_contentId forKey:@"contentId"];
     [aCoder encodeObject:_importance forKey:@"importance"];
     [aCoder encodeObject:_replyTo forKey:@"replyTo"];
     [aCoder encodeObject:_cc forKey:@"cc"];
@@ -326,6 +335,7 @@ static NSString *dataFromStringWithEncodingBase64(NSString *bodyString, NSString
         self.subject = [aDecoder decodeObjectForKey:@"subject"];
         self.timeStamp = [aDecoder decodeObjectForKey:@"timeStamp"];
         self.contentType = [aDecoder decodeObjectForKey:@"contentType"];
+        self.contentId = [aDecoder decodeObjectForKey:@"contentId"];
         self.importance = [aDecoder decodeObjectForKey:@"importance"];
         self.replyTo = [aDecoder decodeObjectForKey:@"replyTo"];
         self.cc = [aDecoder decodeObjectForKey:@"cc"];
@@ -352,6 +362,10 @@ NSString *bodyDataFromStringWithEncoding(const char *bodyData, NSString *content
     {
         contenttype = MimeContentType_Windows_1251;
     }
+    if ([contentType.lowercaseString containsString:@"text/plain; charset=\"iso-8859-5\""] || [contentType.lowercaseString containsString:@"text/html; charset=\"iso-8859-5\""] )
+    {
+        contenttype = MimeContentType_ISO_8859_5;
+    }
     if ([encoding containsString:@"quoted-printable"])
     {
         encode = MimeEncoding_Quoted_printable;
@@ -361,9 +375,9 @@ NSString *bodyDataFromStringWithEncoding(const char *bodyData, NSString *content
         encode = MimeEncoding_Base64;
     }
     
-    if ((contenttype == MimeContentType_KOI8_R || contenttype == MimeContentType_Windows_1251) && (encode == MimeEncoding_Quoted_printable || encode == MimeEncoding_Base64))
+    if ((contenttype == MimeContentType_KOI8_R || contenttype == MimeContentType_Windows_1251 || contenttype == MimeContentType_ISO_8859_5)  && (encode == MimeEncoding_Quoted_printable || encode == MimeEncoding_Base64))
     {
-        return ConvertFrom(bodyData, contenttype, encode);
+        return [MimeConvert ConvertFrom:bodyData MimeEncoding:contenttype MimeEncoding:encode];
     }
     NSString *bodyDataString = [NSString stringWithUTF8String:bodyData];
     if (encode == MimeEncoding_Quoted_printable)
@@ -386,7 +400,7 @@ NSString *MimeEntityGetHeaderValue(MimeEntity *mimeEntity, NSString *headerKey, 
     {
         return nil;
     }
-    return inUtf8 ? [NSString stringWithUTF8String:mimeEntity->header().field(headerKey.UTF8String).value().c_str()] : ConvertHeader(mimeEntity->header().field(headerKey.UTF8String).value().c_str());
+    return inUtf8 ? [NSString stringWithUTF8String:mimeEntity->header().field(headerKey.UTF8String).value().c_str()] : [MimeConvert ConvertHeader:mimeEntity->header().field(headerKey.UTF8String).value().c_str()];
 }
 
 @end
