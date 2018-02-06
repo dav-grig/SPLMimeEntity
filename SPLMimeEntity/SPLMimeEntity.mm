@@ -44,6 +44,8 @@ static NSString *dataFromStringWithEncodingBase64(NSString *bodyString, NSString
         
         if (mailbox.label(0).length() > 0) {
             _label = [MimeConvert ConvertHeader:mailbox.label(0).c_str()];
+            NSCharacterSet *trim = [NSCharacterSet characterSetWithCharactersInString:@"\""];
+            _label = [[_label componentsSeparatedByCharactersInSet:trim] componentsJoinedByString:@""];
         }
     }
     return self;
