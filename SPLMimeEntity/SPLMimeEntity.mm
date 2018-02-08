@@ -155,7 +155,7 @@ static NSString *dataFromStringWithEncodingBase64(NSString *bodyString, NSString
             keyValuePairString = [keyValuePairString stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
             NSString *separatedString = @"=";
             if ([keyValuePairString containsString:@"=\""]) {
-                separatedString = @"=\"";
+                separatedString = @"\"";
             }
             NSArray *keyValuePair = [keyValuePairString componentsSeparatedByString:separatedString];
             
