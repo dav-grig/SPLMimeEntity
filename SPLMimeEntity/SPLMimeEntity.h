@@ -13,7 +13,6 @@
  */
 
 #import <Foundation/Foundation.h>
-#import "EMWMimeConvert.h"
 
 @interface SPLMailbox : NSObject <NSCoding>
 

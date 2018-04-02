@@ -8,6 +8,7 @@
 
 #import "SPLMimeEntity.h"
 #import "Base64.h"
+#import "EMWMimeConvert.h"
 
 #include <iostream>
 #include <algorithm>
@@ -34,8 +35,9 @@ static NSString *dataFromStringWithEncodingBase64(NSString *bodyString, NSString
 - (instancetype)initWithMailbox:(const Mailbox &)mailbox
 {
     if (self = [super init]) {
+        MimeConverter *conv = [[MimeConverter alloc] init];
         if (mailbox.mailbox(0).length() > 0) {
-            _mailbox = [MimeConvert ConvertHeader:mailbox.mailbox(0).c_str()];
+            _mailbox = [conv convert:mailbox.mailbox(0).c_str()];
         }
         
         if (mailbox.domain(0).length() > 0) {
@@ -43,7 +45,7 @@ static NSString *dataFromStringWithEncodingBase64(NSString *bodyString, NSString
         }
         
         if (mailbox.label(0).length() > 0) {
-            _label = [MimeConvert ConvertHeader:mailbox.label(0).c_str()];
+            _label = [conv convert:mailbox.label(0).c_str()];
             NSCharacterSet *trim = [NSCharacterSet characterSetWithCharactersInString:@"\""];
             _label = [[_label componentsSeparatedByCharactersInSet:trim] componentsJoinedByString:@""];
         }
@@ -166,7 +168,8 @@ static NSString *dataFromStringWithEncodingBase64(NSString *bodyString, NSString
                 
                 if ([key containsString:@"filename"] || [key isEqual:@"name"])
                 {
-                    value = [MimeConvert ConvertHeader:[value UTF8String]]; //ConvertHeader([value UTF8String]);
+                    MimeConverter *conv = [[MimeConverter alloc] init];
+                    value = [conv convert:[value UTF8String]];
                     NSMutableCharacterSet *characterSet = [NSMutableCharacterSet whitespaceAndNewlineCharacterSet];
                     [characterSet addCharactersInString:@"\""];
                     return [value stringByTrimmingCharactersInSet:characterSet];
@@ -379,7 +382,8 @@ NSString *bodyDataFromStringWithEncoding(const char *bodyData, NSString *content
     
     if ((contenttype == MimeContentType_KOI8_R || contenttype == MimeContentType_Windows_1251 || contenttype == MimeContentType_ISO_8859_5)  && (encode == MimeEncoding_Quoted_printable || encode == MimeEncoding_Base64))
     {
-        return [MimeConvert ConvertFrom:bodyData MimeEncoding:contenttype MimeEncoding:encode];
+        MimeConverter *conv = [[MimeConverter alloc] init];
+        return [conv convertFrom:bodyData MimeEncoding:contenttype MimeEncoding:encode];
     }
     NSString *bodyDataString = [NSString stringWithUTF8String:bodyData];
     if (encode == MimeEncoding_Quoted_printable)
@@ -402,7 +406,16 @@ NSString *MimeEntityGetHeaderValue(MimeEntity *mimeEntity, NSString *headerKey, 
     {
         return nil;
     }
-    return inUtf8 ? [NSString stringWithUTF8String:mimeEntity->header().field(headerKey.UTF8String).value().c_str()] : [MimeConvert ConvertHeader:mimeEntity->header().field(headerKey.UTF8String).value().c_str()];
+    
+    if (inUtf8)
+    {
+        return [NSString stringWithUTF8String:mimeEntity->header().field(headerKey.UTF8String).value().c_str()];
+    }
+    else
+    {
+        MimeConverter *conv = [[MimeConverter alloc] init];
+        return [conv convert:mimeEntity->header().field(headerKey.UTF8String).value().c_str()];
+    }
 }
 
 @end
