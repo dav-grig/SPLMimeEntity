@@ -17,6 +17,25 @@
 using namespace std;
 using namespace mimetic;
 
+/// For NSCoding Protocol
+static NSString *EMLKeyContentType              = @"EMLKeyContentType";
+static NSString *EMLKeySender                   = @"EMLKeySender";
+static NSString *EMLKeyFrom                     = @"EMLKeyFrom";
+static NSString *EMLKeyTo                       = @"EMLKeyTo";
+static NSString *EMLKeySubject                  = @"EMLKeySubject";
+static NSString *EMLKeyTimeStamp                = @"EMLKeyTimeStamp";
+static NSString *EMLKeyContentId                = @"EMLKeyContentId";
+static NSString *EMLKeyImportance               = @"EMLKeyImportance";
+static NSString *EMLKeyReplyTo                  = @"EMLKeyReplyTo";
+static NSString *EMLKeyCc                       = @"EMLKeyCc";
+static NSString *EMLKeyBcc                      = @"EMLKeyBcc";
+static NSString *EMLKeyMessageId                = @"EMLKeyMessageId";
+static NSString *EMLKeyBodyParts                = @"EMLKeyBodyParts";
+static NSString *EMLKeyBodybase64BodyDataString = @"EMLKeyBodybase64BodyDataString";
+static NSString *EMLKeyBodyDataString           = @"EMLKeyBodyDataString";
+static NSString *EMLKeyString                   = @"EMLKeyString";
+static NSString *EMLKeyFileName                 = @"EMLKeyFileName";
+
 static NSString *dataFromStringWithEncodingBase64(NSString *bodyString, NSString *encoding)
 {
     if ([encoding.lowercaseString isEqualToString:@"base64"])
@@ -312,45 +331,45 @@ static NSString *dataFromStringWithEncodingBase64(NSString *bodyString, NSString
 
 - (void)encodeWithCoder:(nonnull NSCoder *)aCoder
 {
-    [aCoder encodeObject:_sender forKey:@"sender"];
-    [aCoder encodeObject:_from forKey:@"from"];
-    [aCoder encodeObject:_to forKey:@"to"];
-    [aCoder encodeObject:_subject forKey:@"subject"];
-    [aCoder encodeObject:_timeStamp forKey:@"timeStamp"];
-    [aCoder encodeObject:_contentType forKey:@"contentType"];
-    [aCoder encodeObject:_contentId forKey:@"contentId"];
-    [aCoder encodeObject:_importance forKey:@"importance"];
-    [aCoder encodeObject:_replyTo forKey:@"replyTo"];
-    [aCoder encodeObject:_cc forKey:@"cc"];
-    [aCoder encodeObject:_bcc forKey:@"bcc"];
-    [aCoder encodeObject:_messageId forKey:@"messageId"];
-    [aCoder encodeObject:_bodyParts forKey:@"bodyParts"];
-    [aCoder encodeObject:_base64BodyDataString forKey:@"base64BodyDataString"];
-    [aCoder encodeObject:_bodyDataString forKey:@"bodyDataString"];
-    [aCoder encodeObject:_string forKey:@"string"];
-    [aCoder encodeObject:_fileName forKey:@"fileName"];
+    [aCoder encodeObject:_sender forKey:EMLKeySender];
+    [aCoder encodeObject:_from forKey:EMLKeyFrom];
+    [aCoder encodeObject:_to forKey:EMLKeyTo];
+    [aCoder encodeObject:_subject forKey:EMLKeySubject];
+    [aCoder encodeObject:_timeStamp forKey:EMLKeyTimeStamp];
+    [aCoder encodeObject:_contentType forKey:EMLKeyContentType];
+    [aCoder encodeObject:_contentId forKey:EMLKeyContentId];
+    [aCoder encodeObject:_importance forKey:EMLKeyImportance];
+    [aCoder encodeObject:_replyTo forKey:EMLKeyReplyTo];
+    [aCoder encodeObject:_cc forKey:EMLKeyCc];
+    [aCoder encodeObject:_bcc forKey:EMLKeyBcc];
+    [aCoder encodeObject:_messageId forKey:EMLKeyMessageId];
+    [aCoder encodeObject:_bodyParts forKey:EMLKeyBodyParts];
+    [aCoder encodeObject:_base64BodyDataString forKey:EMLKeyBodybase64BodyDataString];
+    [aCoder encodeObject:_bodyDataString forKey:EMLKeyBodyDataString];
+    [aCoder encodeObject:_string forKey:EMLKeyString];
+    [aCoder encodeObject:_fileName forKey:EMLKeyFileName];
 }
 
 - (nullable instancetype)initWithCoder:(nonnull NSCoder *)aDecoder
 {
     if (self = [super init]) {
-        self.sender = [aDecoder decodeObjectForKey:@"sender"];
-        self.from = [aDecoder decodeObjectForKey:@"from"];
-        self.to = [aDecoder decodeObjectForKey:@"to"];
-        self.subject = [aDecoder decodeObjectForKey:@"subject"];
-        self.timeStamp = [aDecoder decodeObjectForKey:@"timeStamp"];
-        self.contentType = [aDecoder decodeObjectForKey:@"contentType"];
-        self.contentId = [aDecoder decodeObjectForKey:@"contentId"];
-        self.importance = [aDecoder decodeObjectForKey:@"importance"];
-        self.replyTo = [aDecoder decodeObjectForKey:@"replyTo"];
-        self.cc = [aDecoder decodeObjectForKey:@"cc"];
-        self.bcc = [aDecoder decodeObjectForKey:@"bcc"];
-        self.messageId = [aDecoder decodeObjectForKey:@"messageId"];
-        self.bodyParts = [aDecoder decodeObjectForKey:@"bodyParts"];
-        self.base64BodyDataString = [aDecoder decodeObjectForKey:@"base64BodyDataString"];
-        self.bodyDataString = [aDecoder decodeObjectForKey:@"bodyDataString"];
-        self.string = [aDecoder decodeObjectForKey:@"string"];
-        self.fileName = [aDecoder decodeObjectForKey:@"fileName"];
+        self.sender                 = [aDecoder decodeObjectForKey:EMLKeySender];
+        self.from                   = [aDecoder decodeObjectForKey:EMLKeyFrom];
+        self.to                     = [aDecoder decodeObjectForKey:EMLKeyTo];
+        self.subject                = [aDecoder decodeObjectForKey:EMLKeySubject];
+        self.timeStamp              = [aDecoder decodeObjectForKey:EMLKeyTimeStamp];
+        self.contentType            = [aDecoder decodeObjectForKey:EMLKeyContentType];
+        self.contentId              = [aDecoder decodeObjectForKey:EMLKeyContentId];
+        self.importance             = [aDecoder decodeObjectForKey:EMLKeyImportance];
+        self.replyTo                = [aDecoder decodeObjectForKey:EMLKeyReplyTo];
+        self.cc                     = [aDecoder decodeObjectForKey:EMLKeyCc];
+        self.bcc                    = [aDecoder decodeObjectForKey:EMLKeyBcc];
+        self.messageId              = [aDecoder decodeObjectForKey:EMLKeyMessageId];
+        self.bodyParts              = [aDecoder decodeObjectForKey:EMLKeyBodyParts];
+        self.base64BodyDataString   = [aDecoder decodeObjectForKey:EMLKeyBodybase64BodyDataString];
+        self.bodyDataString         = [aDecoder decodeObjectForKey:EMLKeyBodyDataString];
+        self.string                 = [aDecoder decodeObjectForKey:EMLKeyString];
+        self.fileName               = [aDecoder decodeObjectForKey:EMLKeyFileName];
     }
     return self;
 }
